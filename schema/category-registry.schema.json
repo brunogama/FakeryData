@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/brunogama/FakeryData/schema/category-registry.schema.json",
+  "title": "Fakery category registry",
+  "type": "object",
+  "required": ["schemaVersion", "categories"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "keyPrefix"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "keyPrefix": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

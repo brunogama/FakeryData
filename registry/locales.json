@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "locales": [
+    {
+      "id": "en",
+      "fixture": "data/en.jsonl",
+      "evidence": "evidence/en.jsonl"
+    }
+  ]
+}

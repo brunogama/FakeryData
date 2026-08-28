@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    {"id": "address", "keyPrefix": "address."},
+    {"id": "commerce", "keyPrefix": "commerce."},
+    {"id": "company", "keyPrefix": "company."},
+    {"id": "internet", "keyPrefix": "internet."},
+    {"id": "lorem", "keyPrefix": "lorem."},
+    {"id": "name", "keyPrefix": "name."},
+    {"id": "phone_number", "keyPrefix": "phone_number."}
+  ]
+}

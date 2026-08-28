@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/brunogama/FakeryData/schema/fixture-evidence.schema.json",
+  "title": "Fakery fixture source and license link",
+  "type": "object",
+  "required": ["recordIndex", "category", "sourceId", "licenseId"],
+  "properties": {
+    "recordIndex": {"type": "integer", "minimum": 0},
+    "category": {"type": "string", "minLength": 1},
+    "sourceId": {"type": "string", "minLength": 1},
+    "licenseId": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

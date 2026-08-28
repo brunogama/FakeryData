@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/brunogama/FakeryData/schema/manifest.schema.json",
+  "title": "Fakery runtime locale bundle manifest",
+  "type": "object",
+  "required": ["schemaVersion", "packVersion", "locale", "fixtureSHA256"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "packVersion": {"type": "string", "minLength": 1},
+    "locale": {"type": "string", "minLength": 1},
+    "fixtureSHA256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}

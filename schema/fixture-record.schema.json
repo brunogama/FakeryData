@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/brunogama/FakeryData/schema/fixture-record.schema.json",
+  "title": "Fakery locale fixture record",
+  "type": "object",
+  "required": ["locale", "key", "value"],
+  "properties": {
+    "locale": {"type": "string", "minLength": 1},
+    "key": {"type": "string", "minLength": 1},
+    "value": {}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "faker-upstream",
+      "description": "Curated values derived from the Faker project data model and reviewed for this fixture",
+      "url": "https://github.com/faker-ruby/faker",
+      "retrievedOn": "2026-08-28"
+    }
+  ]
+}

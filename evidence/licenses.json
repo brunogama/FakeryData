@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "licenses": [
+    {
+      "id": "mit",
+      "name": "MIT License",
+      "spdxId": "MIT",
+      "evidenceUrl": "https://github.com/faker-ruby/faker/blob/main/LICENSE"
+    }
+  ]
+}

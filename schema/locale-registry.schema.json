@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/brunogama/FakeryData/schema/locale-registry.schema.json",
+  "title": "Fakery locale registry",
+  "type": "object",
+  "required": ["schemaVersion", "locales"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "locales": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "fixture", "evidence"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "fixture": {"type": "string", "minLength": 1},
+          "evidence": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
