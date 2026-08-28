@@ -114,7 +114,7 @@ def validate_schema(value: Any, schema: dict[str, Any], context: str) -> None:
             field_schema = properties.get(field)
             if isinstance(field_schema, dict):
                 validate_schema(field_value, field_schema, f"{context}.{field}")
-            elif schema.get("additionalProperties") is False:
+            elif not schema.get("additionalProperties", True):
                 raise ValidationError(f"{context} forbids property {field}")
 
     if isinstance(value, list):
