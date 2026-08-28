@@ -6,7 +6,7 @@ Publication must remain inactive until an authorized maintainer completes all of
 
 1. Protect branch `main`: require pull requests, at least one approval, dismissal of stale approvals, required status check `Validate / data`, conversation resolution, and no force pushes or deletions.
 2. Create the GitHub Actions environment named `publication` and configure required reviewers. Do not add an environment secret.
-3. Create the repository Actions variable named `FAKERY_DATA_PUBLICATION_ENABLED` with the documented gate text maintained by the repository owner. The workflow intentionally fails while this variable is absent or differs from its required gate text.
+3. Create the repository Actions variable named `FAKERY_DATA_PUBLICATION_ENABLED` with the exact non-secret value `reviewed-main-only`. The workflow intentionally fails while this variable is absent or differs.
 4. Review and merge a data change through the protected `main` branch and confirm the `Validate / data` check passed for that exact commit.
 5. Only then, as a later explicit release action, manually dispatch `Publish reviewed locale bundle` on `main` and select the registered locale.
 
