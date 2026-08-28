@@ -28,7 +28,9 @@ jobs:
           PUBLICATION_GATE: ${{ vars.FAKERY_DATA_PUBLICATION_ENABLED }}
         run: test "$PUBLICATION_GATE" = "reviewed-main-only"
       - name: Check out the dispatched main commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Validate reviewed data
         run: |
           python3 scripts/bundle.py validate --root .
@@ -60,11 +62,8 @@ jobs:
           LOCALE: ${{ inputs.locale }}
         run: |
           VERSION=$(cat VERSION)
-          TAG="locale-${LOCALE}-v${VERSION}"
-          if git rev-parse "$TAG" >/dev/null 2>&1 || gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Refusing to replace existing immutable tag or release: $TAG" >&2
-            exit 1
-          fi
+          export TAG="locale-${LOCALE}-v${VERSION}"
+          bash scripts/refuse_existing_release.sh
           gh release create "$TAG" \
             "dist/fakery-locale-${LOCALE}-${VERSION}.tar.gz" \
             "dist/fakery-locale-${LOCALE}-${VERSION}-manifest.json" \

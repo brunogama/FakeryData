@@ -60,11 +60,102 @@ def required_text(record: dict[str, Any], field: str, context: str) -> str:
 
 
 def registry_entries(root: Path, name: str) -> list[dict[str, Any]]:
-    document = load_json(root / "registry" / f"{name}.json")
+    schema_names = {
+        "categories": "category-registry.schema.json",
+        "locales": "locale-registry.schema.json",
+    }
+    schema_name = schema_names.get(name)
+    if schema_name is None:
+        raise ValidationError(f"unsupported registry {name}")
+    document = validated_json(root, f"registry/{name}.json", schema_name)
     entries = document.get(name) if isinstance(document, dict) else None
     if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
         raise ValidationError(f"registry/{name}.json requires an ordered {name} array")
     return entries
+
+
+def schema_type_matches(value: Any, expected: str) -> bool:
+    if expected == "object":
+        return isinstance(value, dict)
+    if expected == "array":
+        return isinstance(value, list)
+    if expected == "string":
+        return isinstance(value, str)
+    if expected == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if expected == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if expected == "boolean":
+        return isinstance(value, bool)
+    if expected == "null":
+        return value is None
+    raise ValidationError(f"unsupported schema type {expected}")
+
+
+def validate_schema(value: Any, schema: dict[str, Any], context: str) -> None:
+    if "const" in schema and value != schema["const"]:
+        raise ValidationError(f"{context} must equal {schema['const']!r}")
+
+    expected_type = schema.get("type")
+    if isinstance(expected_type, str) and not schema_type_matches(value, expected_type):
+        raise ValidationError(f"{context} must be {expected_type}")
+
+    if isinstance(value, dict):
+        required = schema.get("required", [])
+        if isinstance(required, list):
+            for field in required:
+                if isinstance(field, str) and field not in value:
+                    raise ValidationError(f"{context} requires property {field}")
+
+        properties = schema.get("properties", {})
+        if not isinstance(properties, dict):
+            raise ValidationError(f"{context} schema properties must be an object")
+        for field, field_value in value.items():
+            field_schema = properties.get(field)
+            if isinstance(field_schema, dict):
+                validate_schema(field_value, field_schema, f"{context}.{field}")
+            elif schema.get("additionalProperties") is False:
+                raise ValidationError(f"{context} forbids property {field}")
+
+    if isinstance(value, list):
+        item_schema = schema.get("items")
+        if isinstance(item_schema, dict):
+            for index, item in enumerate(value):
+                validate_schema(item, item_schema, f"{context}[{index}]")
+
+    minimum_length = schema.get("minLength")
+    if isinstance(value, str) and isinstance(minimum_length, int):
+        if len(value) < minimum_length:
+            raise ValidationError(f"{context} must contain at least {minimum_length} character(s)")
+
+    minimum = schema.get("minimum")
+    if (
+        isinstance(minimum, (int, float))
+        and isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and value < minimum
+    ):
+        raise ValidationError(f"{context} must be at least {minimum}")
+
+    pattern = schema.get("pattern")
+    if isinstance(value, str) and isinstance(pattern, str):
+        if pattern != "^[0-9a-f]{64}$":
+            raise ValidationError(f"unsupported schema pattern {pattern}")
+        if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+            raise ValidationError(f"{context} does not match required pattern")
+
+
+def loaded_schema(root: Path, schema_name: str) -> dict[str, Any]:
+    schema = load_json(root / "schema" / schema_name)
+    if not isinstance(schema, dict):
+        raise ValidationError(f"schema/{schema_name} must contain a schema object")
+    return schema
+
+
+def validated_json(root: Path, relative_path: str, schema_name: str) -> Any:
+    document = load_json(root / relative_path)
+    validate_schema(document, loaded_schema(root, schema_name), relative_path)
+    return document
 
 
 def validate_locale(
@@ -82,6 +173,13 @@ def validate_locale(
     )
     fixture_data, fixtures = load_jsonl(fixture_path, "fixture data")
     _, evidence = load_jsonl(evidence_path, "fixture evidence")
+    fixture_schema = loaded_schema(root, "fixture-record.schema.json")
+    for index, fixture in enumerate(fixtures):
+        validate_schema(fixture, fixture_schema, f"fixture data line {index + 1}")
+    evidence_schema = loaded_schema(root, "fixture-evidence.schema.json")
+    for index, link in enumerate(evidence):
+        validate_schema(link, evidence_schema, f"fixture evidence line {index + 1}")
+
 
     categories = registry_entries(root, "categories")
     category_prefixes = {
@@ -90,8 +188,12 @@ def validate_locale(
         )
         for category in categories
     }
-    source_document = load_json(root / "evidence" / "sources.json")
-    license_document = load_json(root / "evidence" / "licenses.json")
+    source_document = validated_json(
+        root, "evidence/sources.json", "source-evidence.schema.json"
+    )
+    license_document = validated_json(
+        root, "evidence/licenses.json", "license-evidence.schema.json"
+    )
     source_entries = source_document.get("sources") if isinstance(source_document, dict) else None
     license_entries = (
         license_document.get("licenses") if isinstance(license_document, dict) else None
@@ -225,6 +327,7 @@ def package_command(arguments: argparse.Namespace) -> None:
         "packVersion": version,
         "schemaVersion": 1,
     }
+    validate_schema(manifest, loaded_schema(root, "manifest.schema.json"), "manifest.json")
     manifest_data = (
         json.dumps(manifest, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
         + "\n"

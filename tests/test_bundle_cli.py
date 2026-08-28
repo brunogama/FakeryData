@@ -1,5 +1,7 @@
 import hashlib
 import json
+import os
+import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -20,6 +22,111 @@ class BundleCLITests(unittest.TestCase):
             text=True,
             check=False,
         )
+
+    def copy_root(self, temporary_directory: str) -> Path:
+        copied = Path(temporary_directory) / "repository"
+        shutil.copytree(ROOT, copied)
+        return copied
+
+    def archive_bytes(self, archive: tarfile.TarFile, name: str) -> bytes:
+        member = archive.extractfile(name)
+        if member is None:
+            self.fail(f"archive member is not a regular file: {name}")
+        return member.read()
+
+    def test_validate_rejects_wrong_source_schema_version(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = self.copy_root(temporary_directory)
+            path = root / "evidence" / "sources.json"
+            document = json.loads(path.read_text(encoding="utf-8"))
+            document["schemaVersion"] = 99
+            path.write_text(json.dumps(document), encoding="utf-8")
+
+            result = self.run_cli("validate", "--root", str(root))
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("evidence/sources.json.schemaVersion must equal 1", result.stderr)
+
+    def test_validate_rejects_license_without_spdx_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = self.copy_root(temporary_directory)
+            path = root / "evidence" / "licenses.json"
+            document = json.loads(path.read_text(encoding="utf-8"))
+            del document["licenses"][0]["spdxId"]
+            path.write_text(json.dumps(document), encoding="utf-8")
+
+            result = self.run_cli("validate", "--root", str(root))
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires property spdxId", result.stderr)
+
+    def test_validate_rejects_forbidden_fixture_property(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = self.copy_root(temporary_directory)
+            path = root / "data" / "en.jsonl"
+            records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+            records[0]["unexpected"] = "not allowed"
+            path.write_text(
+                "".join(json.dumps(record) + "\n" for record in records), encoding="utf-8"
+            )
+
+            result = self.run_cli("validate", "--root", str(root))
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("fixture data line 1 forbids property unexpected", result.stderr)
+
+    def test_remote_tag_guard_rejects_tag_missing_from_shallow_checkout(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary = Path(temporary_directory)
+            remote = temporary / "remote.git"
+            source = temporary / "source"
+            shallow = temporary / "shallow"
+            subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+            subprocess.run(["git", "init", str(source)], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(source), "config", "user.name", "Test"], check=True)
+            subprocess.run(
+                ["git", "-C", str(source), "config", "user.email", "test@example.invalid"],
+                check=True,
+            )
+            (source / "reviewed.txt").write_text("reviewed\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(source), "add", "reviewed.txt"], check=True)
+            subprocess.run(["git", "-C", str(source), "commit", "-m", "reviewed"], check=True)
+            subprocess.run(["git", "-C", str(source), "tag", "existing-tag"], check=True)
+            subprocess.run(
+                ["git", "-C", str(source), "push", str(remote), "HEAD:main", "existing-tag"],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "clone", "--depth", "1", f"file://{remote}", str(shallow)],
+                check=True,
+                capture_output=True,
+            )
+
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts" / "refuse_existing_release.sh")],
+                cwd=shallow,
+                env={**os.environ, "TAG": "existing-tag"},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Refusing to replace existing immutable tag or release", result.stderr)
+
+    def test_validate_rejects_source_without_required_url(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = self.copy_root(temporary_directory)
+            path = root / "evidence" / "sources.json"
+            document = json.loads(path.read_text(encoding="utf-8"))
+            del document["sources"][0]["url"]
+            path.write_text(json.dumps(document), encoding="utf-8")
+
+            result = self.run_cli("validate", "--root", str(root))
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires property url", result.stderr)
 
     def test_validate_accepts_reviewed_fixture_and_evidence(self) -> None:
         result = self.run_cli("validate", "--root", str(ROOT))
@@ -73,8 +180,8 @@ class BundleCLITests(unittest.TestCase):
 
             with tarfile.open(first_archive, "r:gz") as archive:
                 self.assertEqual(archive.getnames(), ["manifest.json", "fakery.jsonl"])
-                manifest = json.load(archive.extractfile("manifest.json"))
-                fixture_bytes = archive.extractfile("fakery.jsonl").read()
+                manifest = json.loads(self.archive_bytes(archive, "manifest.json"))
+                fixture_bytes = self.archive_bytes(archive, "fakery.jsonl")
 
             self.assertEqual(
                 manifest,
@@ -102,7 +209,7 @@ class BundleCLITests(unittest.TestCase):
                 Path(temporary_directory) / "fakery-locale-en-2026.08.1.tar.gz"
             )
             with tarfile.open(archive_path, "r:gz") as archive:
-                packaged = archive.extractfile("fakery.jsonl").read()
+                packaged = self.archive_bytes(archive, "fakery.jsonl")
 
         self.assertEqual(packaged, (ROOT / "data" / "en.jsonl").read_bytes())
 
